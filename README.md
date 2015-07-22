@@ -1,7 +1,7 @@
 # AllyChat API
-версия 0.10.2
+версия 0.11.3
 
-дата обновления 08/07/2015
+дата обновления 21/07/2015
 
 # Список ошибок
 
@@ -10,6 +10,11 @@
 - `1011` Missing auth_token
 - `1012` Invalid or expired auth_token
 - `1020` Unknown app_id
+- `1030` Missing alias
+- `1031` Can not register user
+- `1040` Missing device_id
+- `1050` Missing device_platform
+- `1100` Unsupported Content-Type
 
 # REST API
 ---
@@ -63,7 +68,7 @@ curl -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache" 'h
 ### <a name="user_register"></a>Регистрация нового клиента
 
 ```
-curl -X POST /api/user/register
+curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'alias=test' 'http://127.0.0.1:8080/api/user/register'
 ```
 
 ### Список пользователей
@@ -214,6 +219,19 @@ curl -X GET /api/user/([^/]+)/active_rooms
 
 ```
 curl -X GET /api/me
+```
+
+### Регистрация нового устройства для отправки PUSH уведомлений
+
+Пример для Android
+```
+curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'device_id=1&device_platform=android&device_token=123456&gsm_sender_id=123' 'http://127.0.0.1:8080/api/user/5565a9be659d5530dab7f588/devices?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNzQ3ODM3MCwiaWF0IjoxNDM3NDc0NzcwfQ.eyJ1c2VyX2lkIjoiNTU2NWE5YmU2NTlkNTUzMGRhYjdmNTg4In0.vBYmoRuDmVCjYSbG-hmnEyX4K07EHd0LfnZbgOI6foQ'
+```
+
+Пример для iOS
+
+```
+curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'device_id=2&device_platform=ios&device_token=234567' 'http://127.0.0.1:8080/api/user/5565a9be659d5530dab7f588/devices?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNzQ3ODM3MCwiaWF0IjoxNDM3NDc0NzcwfQ.eyJ1c2VyX2lkIjoiNTU2NWE5YmU2NTlkNTUzMGRhYjdmNTg4In0.vBYmoRuDmVCjYSbG-hmnEyX4K07EHd0LfnZbgOI6foQ'
 ```
 
 ## Комнаты
@@ -460,31 +478,8 @@ curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/tags?token=ey
 "content": {
          "room": "55409c8d239728dbe4d4ea8b", 
          "message": "Hello Friend!",
-         "file": "http://host/1.jpg"
-        }
-}
-```
-
-### Send read status
-
-```
-{
-"type": “read”,
-"content": {
-         "room": "55409c8d239728dbe4d4ea8b",
-         "message": "55409c8d239728dbe4d4ea22"
-        }
-}
-```
-
-### User data
-
-```
-{
-"type": “user_data”, 
-"content": {
-         "alias": “1234567890”,
-         "parse_id": “AGC1O4”
+         "file": "http://host/1.jpg",
+         "client_id": "1234567890"
         }
 }
 ```
@@ -499,29 +494,9 @@ curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/tags?token=ey
          "room": “55409c8d239728dbe4d4ea8b”,
          "sender": “55409c8d239728dbe4d4ea8b”,
          "message": "Hello Friend!",
-         "file": "http://host/1.jpg"
+         "file": "http://host/1.jpg",
+         "client_id": "1234567890"
         }
 }
 ```
 
-### Банковская часть API
-
-## Получение alias пользователя по номеру телефона
-
-```
-curl -X GET -u admin:PKElT2jRDIWcqHIV http://testjmb.alfabank.ru/AlfaSense/support/phone/9154983795/alias
-```
-
-```
-{"alias": "AFAMJ7"}
-```
-
-## Получение имени и телефона по alias
-
-```
-curl -X GET -u admin:PKElT2jRDIWcqHIV http://testjmb.alfabank.ru/AlfaSense/support/alias/AFAMJ7/customer
-```
-
-```
-{"phone": "79154983795", "fio": "\u041f\u0430\u0447\u0430\u0439 \u0410\u043d\u0434\u0440\u0435\u0439 \u0412\u0430\u0434\u0438\u043c\u043e\u0432\u0438\u0447             "}
-```
