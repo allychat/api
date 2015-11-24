@@ -1,7 +1,7 @@
 # AllyChat API
-версия 0.11.3
+версия 0.26.0
 
-дата обновления 21/07/2015
+дата обновления 09/11/2015
 
 # Список ошибок
 
@@ -12,20 +12,113 @@
 - `1020` Unknown app_id
 - `1030` Missing alias
 - `1031` Can not register user
+- `1032` Wrong alias, you should register user first
 - `1040` Missing device_id
 - `1050` Missing device_platform
+- `1060` Missing device_token
+- `1070` Unsupported tag
+- `1080` Unsupported room status
 - `1100` Unsupported Content-Type
+- `1110` Invalid id
+- `1120` Missing current_password
+
+# Общие правила
+
+## Alias
+
+Для идентификации клиентов SDK передает на сервер `alias`. Приложение может передать в это поле свой внутренний идентификатор клиента, чтобы операторы смогли идентифицировать клиента.
+ 
+## Правила генерации alias если он не задан 
+
+Приложоение может не задавать `alias`. В этом случае SDK генерирует по следующим правилам:
+
+`allychat_anonym_client_<uid>`, где `<uid>` - уникальный идентификатор, состоящий из 32 двух символов, латинские буквы и цифры.
+
+Регистр не важен.
+
+Например: `allychat_anonym_client_430886438DC14931A3E75A4F36AB1D42`
 
 # REST API
 ---
 
+GET методы возвращают JSON, который содержит запрашиваемый объект, либо коллекцию объектов с указанием общего количества объектов в поле `count` без учета пагинации.
+
+## Объекты
+---
+
+\* - поля, обязательные к заполнению. Остальные могут принимать null.
+
+### <a name="user"></a>User
+
+1. **id***
+2. **alias*** - идентификатор клиента
+3. name - имя
+4. app_version - версия приложения
+5. os_version - версия ОСи
+6. **device_type*** - тип устройства (os/android)
+7. geolocation - геолокация (долгота, широта)
+8. tzoffset - смещение времени относительно UTC в секундах
+9. avatar_url - URL аватара
+10. is_anonym - клиент, для которого `alias` не был задан явно, а был сгенерирован в SDK
+
+### Room
+
+0. **id***
+1. first_message - идентификатор исторически первого сообщения в комнате
+2. **users*** - список идентификаторов объекта `user`, участников этой комнаты, без учета операторов
+3. last_message - исторически последнее сообщение `message` в комнате
+4. active_operators - идентификаторы объекта `user` операторов, подключенных к комнате
+5. **is_support*** - `true` для комнаты поддержки, иначе `false`
+6. last_read_message_id - идентификатор сообщения `message` прочитанное текущим клиентом, отображается исторически последнее такое сообщение
+
+### Message
+
+0. **id***
+1. **read*** - `true` если сообщение прочитано текущим клиентов, иначе `false`
+2. client_id - клиентский идентификатор, если задан
+3. message - текст сообщения
+4. event - событие (например: `review_requested`)
+5. room - `id` объекта `room`
+6. sender - отправитель `operator`
+1. file - URL файла
+8. **created_at*** - время создания сообщения в секундах (например: `1445943734.019197`)
+9. **created_at_millis*** - время создания сообщения в миллисекундах (например: `1445943734019`)
+
+### Operator
+
+0. **id*** - `id` объекта `user`
+1. alias - `alias` объекта `user`
+2. avatar_url - `avatar_url` объекта `user`
+3. name - `name` объекта `user`
+
+### Device
+
+0. **id***
+1. **app_id*** - `app_id`
+2. **user_id*** - `id` объекта `user`
+3. **device_id*** - заданый SDK идентификатор устройства
+4. **device_platform*** - `ios` для iOS, `android` для Android
+5. **device_token*** - PUSH токен
+
+### File
+
+1. **file*** - URL файла
+
 ## Авторизация
 ---
 
-### Авторизация администратора или оператора поддержки
+Большинство методов REST API требуют авторизацию. Для доступа к ним нужно передать сессионный токен в заголовке.
+
+Пример:
 
 ```
-curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/x-www-form-urlencoded" -d 'login=admin&password=admin' http://sense-dev.achat.octoberry.net/api/auth
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Token eyJhbGciOiJIUzI1NiIsImV4cCI6MTQ0NjYyMzkwNywiaWF0IjoxNDQ2NjIwMzA3fQ.eyJ1c2VyX2lkIjoiNTYzMjFkODFkNDhmNTRmNmFkMzZmZmZhIn0.n9zA2I8tU-khX7g7AAT_mjBi-j0IwPYK0ForFa0smF8" https://my.allychat.ru/api/token/update
+```
+
+### Получение сессионного токена для администратора или оператора поддержки
+
+```
+curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'login=admin&password=admin' 'https://my.allychat.ru/api/auth'
 ```
 
 ```
@@ -34,14 +127,14 @@ curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/x-www-fo
 }
 ```
 
-### Авторизация клиента
+### Получение сессионного токена для клиента
 
 Перед получением токена нужно зарегистрировать нового клиента (см. [Регистрация нового клиента](#user_register))
 
-Для получения сессионного токена нужно передать `alias` клиента
+Для получения сессионного токена нужно передать `alias` клиента и `app_id`
 
 ```
-curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/x-www-form-urlencoded" -d 'alias=test&app_id=sensetest' http://sense-dev.achat.octoberry.net/api/token
+curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'alias=test&app_id=app' https://my.allychat.ru/api/2/token
 ```
 
 ```
@@ -53,7 +146,7 @@ curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/x-www-fo
 ### Обновление токена
 
 ```
-curl -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache" 'http://127.0.0.1:8080/api/token/update?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNjI4MTQ0NCwiaWF0IjoxNDM2Mjc3ODQ0fQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.7APan4sBB08xAZ9s9aaHLizuIp827Wdz3Ap5-4uvm9w'
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Token eyJhbGciOiJIUzI1NiIsImV4cCI6MTQ0NjYyMzkwNywiaWF0IjoxNDQ2NjIwMzA3fQ.eyJ1c2VyX2lkIjoiNTYzMjFkODFkNDhmNTRmNmFkMzZmZmZhIn0.n9zA2I8tU-khX7g7AAT_mjBi-j0IwPYK0ForFa0smF8" https://my.allychat.ru/api/token/update
 ```
 
 ```
@@ -68,13 +161,19 @@ curl -X POST -H "Content-Type: application/json" -H "Cache-Control: no-cache" 'h
 ### <a name="user_register"></a>Регистрация нового клиента
 
 ```
-curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'alias=test' 'http://127.0.0.1:8080/api/user/register'
+POST /api/2/user/register
+```
+
+### Текущий пользователь
+
+```
+GET /api/2/me
 ```
 
 ### Список пользователей
 
 ```
-curl -X GET /api/users
+GET /api/2/users
 ```
 
 Возможные фильтры:
@@ -83,285 +182,120 @@ curl -X GET /api/users
 - `alias[]` поиск по нескольким алиасам
 - `id[]` поиск по нескольким `id`
 
-### Поиск пользователя по alias
-
-```
-curl -X GET -H "Cache-Control: no-cache" http://sense-dev.achat.octoberry.net/api/users?alias=AFAMJ7&token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzMzc3MjE5OSwiaWF0IjoxNDMzNzY4NTk5fQ.eyJ1c2VyX2lkIjoiNTU0MDljOGQyMzk3MjhkYmU0ZDRlYThiIn0.ZEKG06uTm-ObHF7u8F_emvgtQ_bVHZ5yv93mS1Htyok
-```
-
-```
-{
-    "users": [
-        {
-        "alias": "AFAMJ7",
-        "id": "554c79f423972813a5e91234",
-        }
-    ]
-}
-```
-
-### Поиск пользователя по alias пачкой
-
-```
-curl -X GET -H "Cache-Control: no-cache" http://sense-dev.achat.octoberry.net/api/users?alias[]=AFAMJ7&alias[]=AGC1O4&token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzMzg3MzA5OSwiaWF0IjoxNDMzODY5NDk5fQ.eyJ1c2VyX2lkIjoiNTU0Yzc5ZjQyMzk3MjgxM2E1ZTkxMjM0In0.60BxbS6cryRJpGy7LQ6W896X22UrBY5zm1N1rZM4WwI
-```
-
-```
-{
-    "users": [
-        {
-            "alias": "AFAMJ7",
-            "avatar_url": "https://scontent.xx.fbcdn.net/hphotos-xpa1/v/t1.0-9/10177358_10152090522570899_1531763069910757194_n.jpg?oh=295d97d7a7e61c72ec7f66615f532333&oe=55F29D9B",
-            "id": "554c79f423972813a5e91234"
-        },
-        {
-            "alias": "AGC1O4",
-            "avatar_url": "https://fbcdn-profile-a.akamaihd.net/hprofile-ak-ash2/v/t1.0-1/574679_570350889704200_903096688_n.jpg?oh=3d550ea461ccf3da9115cb506bc4882a",
-            "id": "554a2168239728a0fc6c2f21"
-        }
-    ]
-}
-```
-
 ### Данные пользователя
 
 ```
-curl -X GET /api/user/([^/]+)
+GET /api/2/user/<id>
 ```
+
+В качестве id можно передать:
+
+- идентификатор `id` объекта `user`
+- `alias`
 
 ### Обновление данных пользователя
 
 ```
-curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/x-www-form-urlencoded" -d 'avatar_url=http%3A%2F%2Foctoberry.ru%2Fimg%2Flogo.png' http://127.0.0.1:8080/api/user/5565a9be659d5530dab7f588?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzMzc3NTQ3NywiaWF0IjoxNDMzNzcxODc3fQ.eyJ1c2VyX2lkIjoiNTU2NWE5YmU2NTlkNTUzMGRhYjdmNTg4In0.Xx5eODUsFO0JATVM6foZSn-TA3rq4TsH2vN5UDM6CVM
+POST /api/2/user/<id>
 ```
 
-### Комнаты, доступные для пользователя
+В качестве id можно передать:
 
-```
-curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/user/5565a9be659d5530dab7f588/rooms?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzMzg2OTQ4MiwiaWF0IjoxNDMzODY1ODgyfQ.eyJ1c2VyX2lkIjoiNTU2NWE5YmU2NTlkNTUzMGRhYjdmNTg4In0.tJMsriOOHVEwR4-ENOyYuiJRi8BQYSUhRgFOcFjGwyU
-```
-
-```
-{
-    "rooms": [
-        {
-            "status": 0,
-            "last_issue": null,
-            "first_message": null,
-            "users": [
-                {
-                    "id": "5565a9be659d5530dab7f588"
-                }
-            ],
-            "tags": [],
-            "last_message": null,
-            "id": "5565a9be659d5530dab7f589",
-            "is_support": true
-        },
-        {
-            "status": 0,
-            "last_issue": null,
-            "first_message": null,
-            "users": [
-                {
-                    "id": "5565a9be659d5530dab7f588"
-                },
-                {
-                    "id": "55507814b77ffcb9cc9e0d5c"
-                }
-            ],
-            "tags": [],
-            "last_message": {
-                "room": "5565bfdf659d5544aed2714a",
-                "created_at": 1432821881.148508,
-                "file": null,
-                "message": "Привет, приложение обновилось! Список изменений тут - https://goo.gl/ablcYh. Пользуйтесь и давайте рекомендации. Поддержка в чате работает в тестовом режиме,поэтому заранее приносим прощения за долгий ответ. С любовью команда Sense.",
-                "issue": null,
-                "id": "55672079659d55ca3fe3ebd4",
-                "sender": "552fe60a3cf39d1fb26afe0d"
-            },
-            "id": "5565bfdf659d5544aed2714a",
-            "is_support": false,
-            "last_read_message_id": "55672079659d55ca3fe3ebd4"
-        }
-    ]
-}
-```
-
-### Идентификаторы последних прочитанных сообщений пользователя
-
-```
-curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/user/5565a9be659d5530dab7f588/user_rooms?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzMzg2MTg2NCwiaWF0IjoxNDMzODU4MjY0fQ.eyJ1c2VyX2lkIjoiNTU2NWE5YmU2NTlkNTUzMGRhYjdmNTg4In0.LVmdjPMntJ_pKQlohHpeP8CrNyusrKjAQXoGrToBDJc
-```
-
-```
-{
-    "user_rooms": [
-        {
-          "user_id": "5565a9be659d5530dab7f588",
-          "room_id": "5565bfdf659d5544aed2714a",
-          "id": "5576f168659d5569f811d928",
-          "last_read_message_id": "55672079659d55ca3fe3ebd4"
-        }
-    ]
-}
-```
-
-### Список активных комнат пользователя
-
-Список комнат, обозначенных как активные для администатора или оператора. Комната может быть активной только у одного оператора или админситратора.
-
-```
-curl -X GET /api/user/([^/]+)/active_rooms
-```
-
-### Текущий пользователь
-
-```
-curl -X GET /api/me
-```
-
-### Регистрация нового устройства для отправки PUSH уведомлений
-
-Пример для Android
-```
-curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'device_id=1&device_platform=android&device_token=123456&gsm_sender_id=123' 'http://127.0.0.1:8080/api/user/5565a9be659d5530dab7f588/devices?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNzQ3ODM3MCwiaWF0IjoxNDM3NDc0NzcwfQ.eyJ1c2VyX2lkIjoiNTU2NWE5YmU2NTlkNTUzMGRhYjdmNTg4In0.vBYmoRuDmVCjYSbG-hmnEyX4K07EHd0LfnZbgOI6foQ'
-```
-
-Пример для iOS
-
-```
-curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'device_id=2&device_platform=ios&device_token=234567' 'http://127.0.0.1:8080/api/user/5565a9be659d5530dab7f588/devices?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNzQ3ODM3MCwiaWF0IjoxNDM3NDc0NzcwfQ.eyJ1c2VyX2lkIjoiNTU2NWE5YmU2NTlkNTUzMGRhYjdmNTg4In0.vBYmoRuDmVCjYSbG-hmnEyX4K07EHd0LfnZbgOI6foQ'
-```
+- идентификатор `id` объекта `user`
+- `alias`
 
 ## Комнаты
 ---
 
-### Данные комнаты
+### Комнаты, доступные для пользователя
 
 ```
-curl -X GET /api/room/([^/]+
-```
-
-### Сделать комнату активной
-
-Администратор или оператор может сделать комнату активной. Комната может быть активной только у одного оператора или админситратора. При попытке сделать активной комнату, которая уже активная для другого пользователя, сервис вернет ошибку.
-
-```
-curl -X PUT /api/room/([^/]+)/active
+GET /api/2/rooms
 ```
 
 ```
-curl -X DELETE /api/room/([^/]+)/active
+GET /api/2/user/<id>/rooms
 ```
+
+### Комната поддержки
+
+```
+GET /api/2/room/support
+```
+
+```
+GET /api/2/user/<id>/room/support
+```
+
+- идентификатор `id` объекта `user`
+- `alias`
+
 
 ### Список сообщений для комнаты
 
 ```
-curl -X GET /api/room/([^/]+/messages
+GET /api/2/room/<id>/messages
 ```
 
-### Теги комнаты
+В качестве id можно передать:
 
-Администратор может задать тег для комнаты
+- `id` объекта `room`
+- 'support', в этом случае вернется комната поддержки
+
+
+## Устройства (для PUSH уведомлений)
+---
+
+### Регистрация нового устройства для отправки PUSH уведомлений
 
 ```
-curl -X POST -H "Cache-Control: no-cache" -H "Content-Type: application/x-www-form-urlencoded" -d 'tag=test' /api/room/([^/]+/tags
+POST /api/2/user/<id>/devices
 ```
 
+### Удаление устройства, отказ от PUSH уведомлений
+
 ```
-curl -X DELETE -H "Cache-Control: no-cache" -H "Content-Type: application/x-www-form-urlencoded" -d 'tag=test' /api/room/([^/]+)/tag
+DELETE /api/2/user/<id>/devices
 ```
 
 ## Загрузка изображений
 ---
 
 ```
-curl -X POST /api/upload
+POST /api/2/upload
 ```
+
+Бинарный файл в поле `file`. Будет возвращен объект `file`.
 
 ## Сообщения
 ---
 
 ### Список сообщений
 
-Сообщения по id
+```
+GET /api/2/room/<id>messages
+```
 
-```
-curl -X GET /api/messages?id[]=1&id[]=2&id[]=3
-```
+Возможные фильтры:
+
+- `unread`, показать только непрочитанные сообщения
+
+Пагинация:
+
+- `limit`, лимит количества объектов в результате
+- `offset`, смещение
 
 ### Данные сообщения
 
 ```
-curl -X GET /api/message/([^/]+)
+GET /api/2/message/<id>
 ```
 
 ### Сообщение прочитано
 
 ```
-curl -X PUT /api/message/([^/]+)/read
+PUT /api/2/message/<id>/read
 ```
-
-## Обращения
----
-
-### Данные обращения
-
-```
-curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/issue/557045ca659d55578a86ecdc?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzMzk0NjI1OCwiaWF0IjoxNDMzOTQyNjU4fQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.Vl-Ldmxf5KpI_yExCfsNMjNTrGAkWJQSl2LSr-JkAJE
-```
-
-```
-{
-    "last_message": {
-        "room": "55507814b77ffcb9cc9e0d5d",
-        "created_at": 1433422432.770775,
-        "file": null,
-        "message": "мобильный",
-        "issue": "557045ca659d55578a86ecdc",
-        "id": "55704a60659d55578a934eec",
-        "sender": "55507814b77ffcb9cc9e0d5c"
-    },
-    "first_message": {
-        "room": "55507814b77ffcb9cc9e0d5d",
-        "created_at": 1433421258.135883,
-        "file": null,
-        "message": "ЕПД",
-        "issue": "557045ca659d55578a86ecdc",
-        "id": "557045ca659d55578a86ecdd",
-        "sender": "55507814b77ffcb9cc9e0d5c"
-    },
-    "is_open": true,
-    "room": "55507814b77ffcb9cc9e0d5d",
-    "tags": [],
-    "answered_at": null,
-    "closed_at": null,
-    "created_at": 1433421258.138776,
-    "id": "557045ca659d55578a86ecdc",
-    "closed_by": null
-}
-```
-
-### Ответы на обращения
-
-Система пытается найти в истории сообщений подходящий ответ
-
-```
-curl -X GET /api/issue/([^/]+)/answers
-```
-
-### Статистика обращений по дням
-
-```
-curl -X GET /api/issues/stats
-```
-
-Возможные фильтры:
-
-- `tag` тег, например `concierge`
-- `closed_by` id оператора или админа, который закрыл обращение
-- `is_open` флаг, открыто `1` или закрыто `0` обращение
 
 ## Системные 
 ---
@@ -369,103 +303,33 @@ curl -X GET /api/issues/stats
 ### Текущее время на сервере
 
 ```
-curl -X GET /api/time
+GET /api/2/time
 ```
 
 ### Список операторов и админов
 
 ```
-curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/operators?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNDAxODk3MSwiaWF0IjoxNDM0MDE1MzcxfQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.IRRYD0M3_nUEFiI8QXsLz2bKddo6KmIw75VbA9B4IOo
-```
-
-```
-{
-    "operators": [
-        {
-            "geolocation": null,
-            "is_admin": true,
-            "device_type": null,
-            "id": "5551c9dc8f93458b46601417",
-            "tzoffset": null,
-            "is_operator": false,
-            "os_version": null,
-            "alias": null,
-            "avatar_url": null,
-            "login": "admin2",
-            "app_version": null
-        },
-        {
-            "geolocation": null,
-            "is_admin": true,
-            "device_type": null,
-            "id": "552fe60a3cf39d1fb26afe0d",
-            "tzoffset": null,
-            "is_operator": false,
-            "os_version": null,
-            "alias": null,
-            "avatar_url": null,
-            "login": "admin",
-            "app_version": null
-        },
-        {
-            "geolocation": null,
-            "is_admin": false,
-            "device_type": null,
-            "id": "5559fbcc724b0d1d0228976a",
-            "tzoffset": null,
-            "is_operator": true,
-            "os_version": null,
-            "alias": null,
-            "avatar_url": null,
-            "login": "laya",
-            "app_version": null
-        }
-    ]
-}
+GET /api/2/operators
 ```
 
 ### Просмотр данных оператора
 
 ```
-curl -X GET 'http://127.0.0.1:8080/api/operator/559be7d3659d55854a438214?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNjI4MTQ0NCwiaWF0IjoxNDM2Mjc3ODQ0fQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.7APan4sBB08xAZ9s9aaHLizuIp827Wdz3Ap5-4uvm9w'
-```
-
-### Создание нового оператора
-
-```
-curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -H "Cache-Control: no-cache" -d 'login=test&password=test' 'http://127.0.0.1:8080/api/operator?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNjI4MTQ0NCwiaWF0IjoxNDM2Mjc3ODQ0fQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.7APan4sBB08xAZ9s9aaHLizuIp827Wdz3Ap5-4uvm9w'
-```
-
-### Редактирование данных оператора
-
-```
-curl -X POST -H "Content-Type: application/x-www-form-urlencoded" -d 'login=test&password=test' 'http://127.0.0.1:8080/api/operator/559be7d3659d55854a438214?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNjI4MTQ0NCwiaWF0IjoxNDM2Mjc3ODQ0fQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.7APan4sBB08xAZ9s9aaHLizuIp827Wdz3Ap5-4uvm9w'
-```
-
-### Удаление оператора
-
-```
-curl -X DELETE 'http://127.0.0.1:8080/api/operator/559be7d3659d55854a438214?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNjI4MTQ0NCwiaWF0IjoxNDM2Mjc3ODQ0fQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.7APan4sBB08xAZ9s9aaHLizuIp827Wdz3Ap5-4uvm9w'
+curl /api/2/operator/<id>
 ```
 
 ### Список тегов
 
 ```
-curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/tags?token=eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNDAxODk3MSwiaWF0IjoxNDM0MDE1MzcxfQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.IRRYD0M3_nUEFiI8QXsLz2bKddo6KmIw75VbA9B4IOo
-```
-
-```
-{
-    "tags": [
-        {
-            "tag": "concierge"
-        }
-    ]
-}
+GET /api/2/tags
 ```
 
 # WebSocket API
 ---
+
+```
+/api/2/relay
+```
 
 ## Client -> Server
 ---
@@ -491,12 +355,23 @@ curl -X GET -H "Cache-Control: no-cache" http://127.0.0.1:8080/api/tags?token=ey
 {
 "type": “message”, 
 "content": {
-         "room": “55409c8d239728dbe4d4ea8b”,
-         "sender": “55409c8d239728dbe4d4ea8b”,
-         "message": "Hello Friend!",
-         "file": "http://host/1.jpg",
-         "client_id": "1234567890"
-        }
+        "file": null,
+        "created_at_long": 1445943734019197,
+        "read": true,
+        "client_id": null,
+        "message": "yo",
+        "event": null,
+        "room": "5614fee3659d55f84720a105",
+        "sender": {
+            "alias": null,
+            "avatar_url": "",
+            "id": "552fe60a3cf39d1fb26afe0d",
+            "name": "Админ"
+        },
+        "created_at": 1445943734.019197,
+        "id": "562f59b6659d553d5dedf1ce",
+        "is_hidden": false,
+        "issue": "562f59b4659d553d5dedf1cc"
+       }
 }
 ```
-
