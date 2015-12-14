@@ -1,7 +1,7 @@
 # AllyChat API
-версия 0.26.0
+версия 0.30.0
 
-дата обновления 09/11/2015
+дата обновления 09/12/2015
 
 # Список ошибок
 
@@ -21,6 +21,9 @@
 - `1100` Unsupported Content-Type
 - `1110` Invalid id
 - `1120` Missing current_password
+- `1130` Sender not found
+- `1140` ADMIN_ID incorrect or not set
+- `1150` Email is not allowed for this instance
 
 # Общие правила
 
@@ -213,22 +216,21 @@ POST /api/2/user/<id>
 GET /api/2/rooms
 ```
 
-```
-GET /api/2/user/<id>/rooms
-```
-
 ### Комната поддержки
 
 ```
 GET /api/2/room/support
 ```
 
+### Создание новой комнаты
+
 ```
-GET /api/2/user/<id>/room/support
+POST /api/2/rooms
 ```
 
-- идентификатор `id` объекта `user`
-- `alias`
+user = \<alias\>
+
+alias клиента, с которым нужно сделать новую комнату
 
 
 ### Список сообщений для комнаты
@@ -249,13 +251,13 @@ GET /api/2/room/<id>/messages
 ### Регистрация нового устройства для отправки PUSH уведомлений
 
 ```
-POST /api/2/user/<id>/devices
+POST /api/2/devices
 ```
 
 ### Удаление устройства, отказ от PUSH уведомлений
 
 ```
-DELETE /api/2/user/<id>/devices
+DELETE /api/2/devices
 ```
 
 ## Загрузка изображений
@@ -273,7 +275,7 @@ POST /api/2/upload
 ### Список сообщений
 
 ```
-GET /api/2/room/<id>messages
+GET /api/2/room/<id>/messages
 ```
 
 Возможные фильтры:
@@ -375,3 +377,104 @@ GET /api/2/tags
        }
 }
 ```
+
+# Webhooks
+
+## Авторизация
+
+При каждом запросе методов webhook нужно передать заголовок `X-Magneta-Signature` содержащий подпись запроса, вычесленную по технологии `sha256`.
+
+Пример генерации подписи на python:
+
+```
+import hashlib
+from itsdangerous import HMACAlgorithm, base64_encode
+def sign(self, value):
+    """Returns the signature for the given value"""
+    key = self.settings['WEBHOOK_SECRET']
+    sig = HMACAlgorithm(hashlib.sha256).get_signature(key, value)
+    return base64_encode(sig)
+```
+
+Подпись вычисляется из тела запроса.
+
+## Создание или обновление данных клиента
+
+```
+POST /hook/user_register
+```
+
+```
+{
+"alias": "<alias>",
+"email": "<email>"
+}
+```
+
+- alias* - идентификатор клиента в системе поддержки,
+- email - email клиента
+
+\* - обязательное к заполнению поле
+
+
+## Отправка нового сообщения клиенту
+
+```
+POST /hook/new_message_to_client
+```
+
+```
+{
+"alias": "<alias>",
+"message": "<message>",
+"sender": "<sender>"
+}
+```
+
+- alias* - идентификатор клиента в системе поддержки,
+- message - текст сообщения
+- sender - `login` отправителя
+
+\* - обязательное к заполнению поле
+
+## Отправка информации новом письме от клиента
+
+```
+POST /hook/new_email_from_client
+```
+
+```
+{
+"alias": "<alias>",
+"subject": "<subject>",
+"message": "<message>",
+"attachments": ["<attachment1>", "<attachment2>"]
+}
+```
+
+- alias* - идентификатор клиента в системе поддержки,
+- subject - заголовок письма
+- message - текст письма
+- attachment1, attachment2 - URL на вложения, файлы вложений должны быть предварительно загружены на сервер и доступны для скачивания по URL
+
+\* - обязательное к заполнению поле
+
+## Отправка информации о новом звонке
+
+```
+POST /hook/new_call_from_client
+```
+
+```
+{
+"alias": "<alias>",
+"message": "<message>",
+"record": "<record>"
+}
+```
+
+- alias* - идентификатор клиента в системе поддержки,
+- message - сопроводительное сообщение, например: Продолжительность 1 минута 6 секунд,
+- record - URL на загруженную на сервер запись
+
+\* - обязательное к заполнению поле
