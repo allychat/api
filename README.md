@@ -1,7 +1,7 @@
 # AllyChat API
-версия 0.30.0
+версия 0.43.0
 
-дата обновления 09/12/2015
+дата обновления 09/12/2016
 
 # Список ошибок
 
@@ -69,6 +69,7 @@ GET методы возвращают JSON, который содержит за
 0. **id***
 1. first_message - идентификатор исторически первого сообщения в комнате
 2. **users*** - список идентификаторов объекта `user`, участников этой комнаты, без учета операторов
+3. first_message_id - идентификатор `id` исторически первого сообщения `message` в комнате
 3. last_message - исторически последнее сообщение `message` в комнате
 4. active_operators - идентификаторы объекта `user` операторов, подключенных к комнате
 5. **is_support*** - `true` для комнаты поддержки, иначе `false`
@@ -155,6 +156,52 @@ curl -X POST -H "Content-Type: application/json" -H "Authorization: Token eyJhbG
 ```
 {
 "token": "eyJhbGciOiJIUzI1NiIsImV4cCI6MTQzNjI4MTU2NiwiaWF0IjoxNDM2Mjc3OTY2fQ.eyJ1c2VyX2lkIjoiNTUyZmU2MGEzY2YzOWQxZmIyNmFmZTBkIn0.OlPrIck_YrzKBS5kG8b6thnTHtG61koEuxHBm0BBGJM"
+}
+```
+
+## OAuth2 
+---
+
+Поддержка авторизации через OAuth2 токен.
+
+Пример:
+
+```
+GET https://my.allychat.ru/api/me
+Authorization: Bearer ad0ace58-0d3e-3cb9-8fa7-5f0126895a1f 
+```
+
+### Получение OAuth2 токена для клиента
+
+Для получения OAuth2 токена нужно передать `code` выданный сервером для кросс-авторизации и `app_id`
+
+```
+POST https://my.allychat.ru/api/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+code=ecf397d7-6aa7-3bf3-9e71-6eb5c7e62bce&app_id=app
+```
+
+```
+{
+  "token": "490742ee-a8ee-3bea-bbb0-6d36e7aebc27",
+  "refresh_token": "aad66e40-ee56-32b4-83fc-1215828a383c"
+}
+```
+
+### Обновление OAuth2 токена
+
+```
+POST https://my.allychat.ru/api/oauth2/token/refresh
+Content-Type: application/x-www-form-urlencoded
+
+refresh_token=aad66e40-ee56-32b4-83fc-1215828a383c
+```
+
+```
+{
+  "access_token": "379667a8-07fe-3630-8e68-90cb81292b57",
+  "refresh_token": "495b8471-74d0-35ff-86e9-8b193a5dec81"
 }
 ```
 
